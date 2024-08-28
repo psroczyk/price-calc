@@ -14,9 +14,9 @@ export type ServicePackage =
 
   export interface ServicePrice {
   price: number;
-}
 
-export type YearlyServicePrice = Record<ServiceType, ServicePrice>;
+}
+type YearlyServicePrice = Record<ServiceType, ServicePrice>;
 type YearlyServicePackagesPrice = Record<ServicePackage, ServicePrice>;
 
 export type ServicePricing = Record<ServiceYear, YearlyServicePrice>;

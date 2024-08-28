@@ -1,4 +1,11 @@
-import { ServiceDependencies, ServicePackage, ServicePackagePricing, ServicePricing, ServiceType, ServiceYear } from "./types";
+import {
+  ServiceDependencies,
+  ServicePackage,
+  ServicePackagePricing,
+  ServicePricing,
+  ServiceType,
+  ServiceYear,
+} from "./types";
 
 const basePrices: ServicePricing = {
   "2020": {
@@ -24,7 +31,8 @@ const basePrices: ServicePricing = {
   },
 };
 
-const packagePrices: ServicePackagePricing = { //TODO: this obviously could be changed to other discount-related info which will omit duplicates/use greater discount
+const packagePrices: ServicePackagePricing = {
+  //TODO: this obviously could be changed to other discount-related info which will omit duplicates/use greater discount
   "2020": {
     Photography_VideoRecording: { price: 2200 },
     WeddingSession_Photography: { price: 2000 },
@@ -61,71 +69,118 @@ export const updateSelectedServices = (
 
   switch (action.type) {
     case "Select":
-      const required = requiredServices[action.service];
-      if (
-        required.length > 0 &&
-        !selectedServices.some((selected) => required.includes(selected))
-      )
-        break;
-      if (!selectedServices.includes(action.service))
-        selectedServices.push(action.service);
-      return selectedServices;
-
+      return selectService();
     case "Deselect":
-      if (!selectedServices.includes(action.service)) return selectedServices;
-
-      let updatedServices = selectedServices.filter(
-        (ss) => ss !== action.service
-      );
-      const dependentServices = Object.keys(requiredServices).filter(
-        (service) =>
-          requiredServices[service as ServiceType].includes(action.service)
-      ) as ServiceType[];
-
-      var hasOtherRequiredServices =
-        dependentServices !== null && dependentServices.length > 0
-          ? requiredServices[dependentServices[0]]
-              .filter((req) => req !== action.service)
-              .filter((req) => updatedServices.includes(req)).length > 0
-          : false;
-      if (hasOtherRequiredServices) {
-        return updatedServices;
-      }
-
-      return updatedServices.filter(
-        (service) => !dependentServices.includes(service)
-      );
+      return deselectService();
 
     default:
       return selectedServices;
   }
 
-  return selectedServices;
+  function selectService() {
+    const required = requiredServices[action.service];
+    if (
+      required.length > 0 &&
+      !selectedServices.some((selected) => required.includes(selected))
+    )
+      return selectedServices;
+
+    if (!selectedServices.includes(action.service))
+      selectedServices.push(action.service);
+
+    return selectedServices;
+  }
+
+  function deselectService() {
+    if (!selectedServices.includes(action.service)) return selectedServices;
+
+    let updatedServices = selectedServices.filter(
+      (ss) => ss !== action.service
+    );
+    const dependentServices = Object.keys(requiredServices).filter((service) =>
+      requiredServices[service as ServiceType].includes(action.service)
+    ) as ServiceType[];
+
+    var hasOtherRequiredServicesSelected =
+      dependentServices !== null && dependentServices.length > 0
+        ? requiredServices[dependentServices[0]]
+            .filter((req) => req !== action.service)
+            .filter((req) => updatedServices.includes(req)).length > 0
+        : false;
+    if (hasOtherRequiredServicesSelected) {
+      return updatedServices;
+    }
+
+    return updatedServices.filter(
+      (service) => !dependentServices.includes(service)
+    );
+  }
 };
 
 export const calculatePrice = (
   selectedServices: ServiceType[],
   selectedYear: ServiceYear
 ) => {
-  let totalBasePrice = 0;
-  let finalPrice = 0;
+  let totalBasePrice = calculateBasePrice(selectedServices, selectedYear);
+  let { finalPrice, hasDiscounts } = getPackagesPrice(
+    selectedServices,
+    selectedYear
+  );
+  finalPrice =
+    finalPrice +
+    getPriceForOutOfPackagesServices(selectedServices, selectedYear);
+    
+  return {
+    basePrice: totalBasePrice,
+    finalPrice: hasDiscounts ? finalPrice : totalBasePrice,
+  };
+};
 
+function calculateBasePrice(
+  selectedServices: ServiceType[],
+  selectedYear: ServiceYear
+) {
+  let totalBasePrice = 0;
   selectedServices.forEach((selectedService) => {
     totalBasePrice =
       totalBasePrice + basePrices[selectedYear][selectedService].price;
   });
 
+  return totalBasePrice;
+}
+
+function getPackagesPrice(
+  selectedServices: ServiceType[],
+  selectedYear: ServiceYear
+) {
+  let finalPrice = 0;
   const packages = getPackages(selectedServices);
   if (packages.length > 0)
     packages.forEach((pack) => {
       finalPrice = finalPrice + packagePrices[selectedYear][pack].price;
     });
 
-  return {
-    basePrice: totalBasePrice,
-    finalPrice: packages.length > 0 ? finalPrice : totalBasePrice,
-  };
-};
+  return { finalPrice: finalPrice, hasDiscounts: packages.length > 0 };
+}
+
+function getPriceForOutOfPackagesServices(
+  selectedServices: ServiceType[],
+  selectedYear: ServiceYear
+) {
+  let finalPrice = 0;
+  selectedServices
+    .filter(
+      (selectedService) =>
+        selectedService !== "Photography" &&
+        selectedService !== "VideoRecording" &&
+        selectedService !== "WeddingSession"
+    )
+    .forEach((selectedService) => {
+      finalPrice = finalPrice + basePrices[selectedYear][selectedService].price;
+    });
+
+  return finalPrice;
+}
 
 function getPackages(selectedServices: ServiceType[]) {
   let packages: ServicePackage[] = [];
